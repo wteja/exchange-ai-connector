@@ -161,11 +161,19 @@ project root (Claude Code expands `${VAR}` from your environment):
     "exchange-ai": {
       "command": "uvx",
       "args": ["exchange-ai-connector"],
-      "env": { "EXCHANGE_AI_CLIENT_ID": "${EXCHANGE_AI_CLIENT_ID}" }
+      "env": {
+        "EXCHANGE_AI_CLIENT_ID": "${EXCHANGE_AI_CLIENT_ID}",
+        "EXCHANGE_AI_TIMEZONE": "Asia/Bangkok"
+      }
     }
   }
 }
 ```
+
+`EXCHANGE_AI_TIMEZONE` is optional — omit it to auto-detect from the system
+(`/etc/localtime`, falling back to UTC). `command` can be a bare `uvx` here
+because Claude Code runs from your shell and inherits its `PATH` (unlike the
+Claude Desktop GUI, which needs the absolute path).
 
 Then **fully quit** Claude Desktop (Cmd+Q) and reopen it. The `exchange-ai`
 server and its tools should appear in the tools/connector list.
