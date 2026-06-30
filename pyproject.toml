@@ -1,12 +1,27 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]  # >=1.27 supports PEP 639 (license = "MIT" + license-files)
 build-backend = "hatchling.build"
 
 [project]
 name = "exchange-ai-connector"
-version = "0.1.0"
-description = "MCP server for human-gated email via Microsoft Graph"
+version = "0.2.0"
+description = "MCP server for human-gated Microsoft Graph email and calendar"
+readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Weerayut Teja", email = "teja.weerayut@gmail.com" }]
+keywords = ["mcp", "microsoft-graph", "outlook", "email", "calendar", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Email",
+    "Topic :: Office/Business :: Scheduling",
+]
 dependencies = [
     "mcp>=1.2.0",
     "msal>=1.28",
@@ -16,6 +31,11 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/wteja/exchange-ai-connector"
+Repository = "https://github.com/wteja/exchange-ai-connector"
+Issues = "https://github.com/wteja/exchange-ai-connector/issues"
 
 [project.scripts]
 exchange-ai-connector = "exchange_ai_connector.server:main"

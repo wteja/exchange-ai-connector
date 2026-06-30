@@ -67,18 +67,29 @@ works.
 
 ### 3. Install
 
+Pick one:
+
+**`uvx` (recommended — no clone, no venv).** Requires [uv](https://docs.astral.sh/uv/).
+Nothing to install ahead of time — `uvx` fetches and runs the command in a
+throwaway environment. It's used directly in the Claude Desktop config below, so
+you can skip straight to that section.
+
+**`pipx`** — puts the `exchange-ai-connector` command on your PATH globally:
+
 ```bash
-cd src
-pip install -e .
+pipx install exchange-ai-connector                                  # once on PyPI
+# or straight from source today:
+pipx install git+https://github.com/wteja/exchange-ai-connector
 ```
 
-This installs the `exchange-ai-connector` command into the active Python
-environment. If you used a virtualenv, note its path — you'll need it for the
-Claude Desktop config below:
+**From source (for development):**
 
 ```bash
-which exchange-ai-connector
-# e.g. /Users/you/code/exchange-ai-connector/.venv/bin/exchange-ai-connector
+git clone https://github.com/wteja/exchange-ai-connector
+cd exchange-ai-connector
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+which exchange-ai-connector   # note this path for the Claude Desktop config
 ```
 
 ### 4. Configure environment
@@ -100,13 +111,15 @@ export EXCHANGE_AI_CLIENT_ID="<your-app-client-id>"
 ## Claude Desktop setup
 
 Edit (on macOS) `~/Library/Application Support/Claude/claude_desktop_config.json`
-and add an `exchange-ai` server under `mcpServers`:
+and add an `exchange-ai` server under `mcpServers`. The `uvx` form is the most
+reliable — no clone, no venv, no PATH issues:
 
 ```json
 {
   "mcpServers": {
     "exchange-ai": {
-      "command": "/ABSOLUTE/PATH/TO/.venv/bin/exchange-ai-connector",
+      "command": "uvx",
+      "args": ["exchange-ai-connector"],
       "env": {
         "EXCHANGE_AI_CLIENT_ID": "<your-app-client-id>",
         "EXCHANGE_AI_TIMEZONE": "Asia/Bangkok"
@@ -116,10 +129,36 @@ and add an `exchange-ai` server under `mcpServers`:
 }
 ```
 
-> **Use the absolute path** from `which exchange-ai-connector`. Claude Desktop is
-> a GUI app and does **not** inherit your shell's `PATH`, so a bare
-> `"exchange-ai-connector"` will fail to launch unless the command is installed
-> globally. The `.venv/bin/...` path is the reliable choice.
+Before it's published to PyPI, run from GitHub by swapping the `args`:
+
+```json
+"args": ["--from", "git+https://github.com/wteja/exchange-ai-connector", "exchange-ai-connector"]
+```
+
+If you installed **from source into a venv** instead, use the **absolute path**
+to the binary — Claude Desktop is a GUI app and does **not** inherit your shell's
+`PATH`, so a bare `"exchange-ai-connector"` won't launch:
+
+```json
+"command": "/ABSOLUTE/PATH/TO/.venv/bin/exchange-ai-connector"
+```
+
+### Claude Code (`.mcp.json`)
+
+For Claude Code, put the same server under `mcpServers` in a `.mcp.json` at your
+project root (Claude Code expands `${VAR}` from your environment):
+
+```json
+{
+  "mcpServers": {
+    "exchange-ai": {
+      "command": "uvx",
+      "args": ["exchange-ai-connector"],
+      "env": { "EXCHANGE_AI_CLIENT_ID": "${EXCHANGE_AI_CLIENT_ID}" }
+    }
+  }
+}
+```
 
 Then **fully quit** Claude Desktop (Cmd+Q) and reopen it. The `exchange-ai`
 server and its tools should appear in the tools/connector list.
