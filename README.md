@@ -70,9 +70,16 @@ your OS keychain and refreshed silently afterward.
 
 ### Calendar smoke test (v2)
 
-4. Ask the agent: "What's on my calendar?" → confirm `list_events` returns events.
-5. Ask: "Am I free tomorrow 2–3pm?" → `check_availability` returns free/busy.
-6. Ask: "Create a 30-minute event tomorrow at 2pm titled 'Test'." → the client
+> **Personal-account note:** `list_events`, `read_event`, and `create_event`
+> work on all account types (work, school, and personal outlook.com/hotmail
+> accounts). `check_availability` (free/busy via Graph `getSchedule`) requires
+> a **work or school account** — personal Microsoft accounts are not supported
+> by Graph for this call and will return an error.
+
+1. Ask the agent: "What's on my calendar?" → confirm `list_events` returns events.
+2. Ask: "Am I free tomorrow 2–3pm?" → `check_availability` returns free/busy
+   (work/school account only; see note above).
+3. Ask: "Create a 30-minute event tomorrow at 2pm titled 'Test'." → the client
    shows `create_event(...)` with the full args and waits for your approval.
    Approve → the event appears in Outlook and a `kind:"event"` line is appended
    to `~/.exchange-ai-connector/audit.log`.
