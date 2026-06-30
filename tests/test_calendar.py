@@ -70,3 +70,36 @@ def test_get_schedule_builds_payload():
     assert body["startTime"] == {"dateTime": "2026-07-02T14:00:00", "timeZone": "Asia/Bangkok"}
     assert body["endTime"] == {"dateTime": "2026-07-02T15:00:00", "timeZone": "Asia/Bangkok"}
     assert body["availabilityViewInterval"] == 30
+
+
+def test_create_event_minimal_payload():
+    with patch.object(graph.httpx, "request", return_value=FakeResp(json_data={"id": "ev9"})) as req:
+        out = calendar.create_event(
+            "TOK", "Sync", "2026-07-02T14:00:00", "2026-07-02T15:00:00", "Asia/Bangkok"
+        )
+    assert out == {"id": "ev9"}
+    method, url = req.call_args.args
+    assert method == "POST"
+    assert url.endswith("/me/events")
+    body = req.call_args.kwargs["json"]
+    assert body["subject"] == "Sync"
+    assert body["start"] == {"dateTime": "2026-07-02T14:00:00", "timeZone": "Asia/Bangkok"}
+    assert body["end"] == {"dateTime": "2026-07-02T15:00:00", "timeZone": "Asia/Bangkok"}
+    assert "attendees" not in body
+    assert "body" not in body
+    assert "location" not in body
+
+
+def test_create_event_with_attendees_body_location():
+    with patch.object(graph.httpx, "request", return_value=FakeResp(json_data={"id": "ev9"})) as req:
+        calendar.create_event(
+            "TOK", "Sync", "2026-07-02T14:00:00", "2026-07-02T15:00:00", "Asia/Bangkok",
+            body="agenda", location="Room 1", attendees=["a@b.com", "c@d.com"],
+        )
+    body = req.call_args.kwargs["json"]
+    assert body["body"] == {"contentType": "Text", "content": "agenda"}
+    assert body["location"] == {"displayName": "Room 1"}
+    assert body["attendees"] == [
+        {"emailAddress": {"address": "a@b.com"}, "type": "required"},
+        {"emailAddress": {"address": "c@d.com"}, "type": "required"},
+    ]

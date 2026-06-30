@@ -33,3 +33,21 @@ def get_schedule(token, addresses, start, end, timezone, interval=30):
     }
     resp = _request("POST", "/me/calendar/getSchedule", token, json=payload)
     return resp.json().get("value", [])
+
+
+def create_event(token, subject, start, end, timezone, *, body=None, location=None, attendees=None):
+    event = {
+        "subject": subject,
+        "start": {"dateTime": start, "timeZone": timezone},
+        "end": {"dateTime": end, "timeZone": timezone},
+    }
+    if body:
+        event["body"] = {"contentType": "Text", "content": body}
+    if location:
+        event["location"] = {"displayName": location}
+    if attendees:
+        event["attendees"] = [
+            {"emailAddress": {"address": a}, "type": "required"} for a in attendees
+        ]
+    resp = _request("POST", "/me/events", token, json=event)
+    return resp.json()
