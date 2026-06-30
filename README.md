@@ -83,8 +83,11 @@ Every send appends one JSON line (timestamp, recipients, subject) to
 `~/.exchange-ai-connector/audit.log`. Every created event appends a line with
 `"kind": "event"` (timestamp, subject, start, and attendees if given).
 
-## Scope (v1)
+## Scope
 
-Email only. Calendar, a standalone web approval UI, app-only auth, and
-multi-account approval are deliberately out of scope; see
-`docs/superpowers/specs/2026-06-30-exchange-ai-connector-design.md`.
+- **v1:** email — list/read/thread + gated send.
+- **v2 (this release):** calendar — list/read events, free/busy availability,
+  and gated `create_event`.
+
+A standalone web approval UI, app-only auth, and multi-account approval remain
+deliberately out of scope; see the design specs under `docs/superpowers/specs/`.
