@@ -1,8 +1,17 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 DEFAULT_AUTHORITY = "https://login.microsoftonline.com/common"
-DEFAULT_SCOPES = ("Mail.Read", "Mail.Send")
+DEFAULT_SCOPES = ("Mail.Read", "Mail.Send", "Calendars.ReadWrite")
+
+
+def _local_tz() -> str:
+    # ponytail: read /etc/localtime symlink (macOS/Linux) for the IANA name;
+    # EXCHANGE_AI_TIMEZONE overrides. Falls back to UTC if the symlink is absent.
+    try:
+        return os.readlink("/etc/localtime").split("zoneinfo/")[-1]
+    except OSError:
+        return "UTC"
 
 
 @dataclass(frozen=True)
@@ -11,6 +20,7 @@ class Config:
     authority: str = DEFAULT_AUTHORITY
     scopes: tuple[str, ...] = DEFAULT_SCOPES
     redirect_port: int = 8400
+    timezone: str = field(default_factory=_local_tz)
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -24,4 +34,5 @@ class Config:
         return cls(
             client_id=client_id,
             authority=os.environ.get("EXCHANGE_AI_AUTHORITY", DEFAULT_AUTHORITY),
+            timezone=os.environ.get("EXCHANGE_AI_TIMEZONE") or _local_tz(),
         )

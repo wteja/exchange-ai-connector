@@ -1,7 +1,7 @@
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from . import audit, auth, graph
+from . import audit, auth, calendar, graph
 from .config import Config
 
 config = Config.from_env()
@@ -51,6 +51,52 @@ def send_email(
     ))
     audit.log_send(to, subject, reply_to_id=reply_to_id)
     return {"status": "sent", "to": to, "subject": subject}
+
+
+@mcp.tool(annotations=READ_ONLY)
+def list_events(top: int = 20) -> list[dict]:
+    """List upcoming calendar events, soonest first. Read-only."""
+    return _call(lambda t: calendar.list_events(t, top=top))
+
+
+@mcp.tool(annotations=READ_ONLY)
+def read_event(event_id: str) -> dict:
+    """Read one calendar event in full. Read-only."""
+    return _call(lambda t: calendar.get_event(t, event_id))
+
+
+@mcp.tool(annotations=READ_ONLY)
+def check_availability(
+    start: str,
+    end: str,
+    attendees: list[str] | None = None,
+    interval: int = 30,
+) -> list[dict]:
+    """Free/busy over a window. Times are naive local, e.g. '2026-07-02T14:00:00'.
+    attendees defaults to just you. Read-only."""
+    def run(t):
+        addresses = attendees if attendees else [calendar.get_my_address(t)]
+        return calendar.get_schedule(t, addresses, start, end, config.timezone, interval=interval)
+    return _call(run)
+
+
+@mcp.tool(annotations=DESTRUCTIVE)
+def create_event(
+    subject: str,
+    start: str,
+    end: str,
+    body: str | None = None,
+    location: str | None = None,
+    attendees: list[str] | None = None,
+) -> dict:
+    """Create a calendar event; emails invites to attendees. Times are naive local,
+    e.g. '2026-07-02T14:00:00'. IRREVERSIBLE — the client must confirm before allowing."""
+    event = _call(lambda t: calendar.create_event(
+        t, subject, start, end, config.timezone,
+        body=body, location=location, attendees=attendees,
+    ))
+    audit.log_create_event(subject, start, attendees)
+    return {"status": "created", "subject": subject, "start": start, "id": event.get("id")}
 
 
 def main():

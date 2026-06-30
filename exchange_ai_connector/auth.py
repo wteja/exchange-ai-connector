@@ -41,7 +41,7 @@ def get_token(config, *, force_interactive=False):
         desc = result.get("error_description", "unknown error")
         if "AADSTS65001" in desc:
             raise AuthError(
-                "Admin consent required for Mail.Read/Mail.Send on this tenant. "
+                "Admin consent is required for the requested Microsoft Graph scopes. "
                 "Ask a tenant admin to grant consent, then re-run sign-in. "
                 f"Detail: {desc}"
             )

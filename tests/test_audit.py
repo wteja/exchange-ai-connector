@@ -26,3 +26,21 @@ def test_log_send_records_reply_to_id(tmp_path):
     audit.log_send([], "", reply_to_id="msg-42", path=log)
     entry = json.loads(log.read_text().splitlines()[0])
     assert entry["reply_to_id"] == "msg-42"
+
+
+def test_log_create_event_writes_event_line(tmp_path):
+    p = tmp_path / "audit.log"
+    audit.log_create_event("Sync", "2026-07-02T14:00:00", attendees=["a@b.com"], path=p)
+    line = json.loads(p.read_text().strip())
+    assert line["kind"] == "event"
+    assert line["subject"] == "Sync"
+    assert line["start"] == "2026-07-02T14:00:00"
+    assert line["attendees"] == ["a@b.com"]
+    assert "ts" in line
+
+
+def test_log_create_event_omits_empty_attendees(tmp_path):
+    p = tmp_path / "audit.log"
+    audit.log_create_event("Solo", "2026-07-02T14:00:00", path=p)
+    line = json.loads(p.read_text().strip())
+    assert "attendees" not in line
