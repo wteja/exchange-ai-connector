@@ -4,6 +4,9 @@ An MCP server that lets an AI agent read and act on your Microsoft 365 / Outlook
 **email and calendar**, with every state-changing action (sending mail, creating
 an event) gated by your MCP client's confirmation prompt.
 
+[On PyPI](https://pypi.org/project/exchange-ai-connector/): `uvx exchange-ai-connector`
+or `pipx install exchange-ai-connector`. See [Setup](#setup).
+
 ## Tools
 
 | Tool                 | Kind         | What it does                                           |
@@ -77,8 +80,8 @@ you can skip straight to that section.
 **`pipx`** — puts the `exchange-ai-connector` command on your PATH globally:
 
 ```bash
-pipx install exchange-ai-connector                                  # once on PyPI
-# or straight from source today:
+pipx install exchange-ai-connector
+# or an unreleased version straight from source:
 pipx install git+https://github.com/wteja/exchange-ai-connector
 ```
 
@@ -111,14 +114,14 @@ export EXCHANGE_AI_CLIENT_ID="<your-app-client-id>"
 ## Claude Desktop setup
 
 Edit (on macOS) `~/Library/Application Support/Claude/claude_desktop_config.json`
-and add an `exchange-ai` server under `mcpServers`. The `uvx` form is the most
-reliable — no clone, no venv, no PATH issues:
+and add an `exchange-ai` server under `mcpServers`. The `uvx` form needs no clone
+or venv — it fetches `exchange-ai-connector` from PyPI and runs it:
 
 ```json
 {
   "mcpServers": {
     "exchange-ai": {
-      "command": "uvx",
+      "command": "/opt/homebrew/bin/uvx",
       "args": ["exchange-ai-connector"],
       "env": {
         "EXCHANGE_AI_CLIENT_ID": "<your-app-client-id>",
@@ -129,15 +132,19 @@ reliable — no clone, no venv, no PATH issues:
 }
 ```
 
-Before it's published to PyPI, run from GitHub by swapping the `args`:
+> **Use the absolute path to `uvx`** (`which uvx` — e.g.
+> `/opt/homebrew/bin/uvx` on Apple-Silicon Homebrew). Claude Desktop is a GUI app
+> and does **not** inherit your shell's `PATH`, so a bare `"uvx"` won't be found.
 
-```json
-"args": ["--from", "git+https://github.com/wteja/exchange-ai-connector", "exchange-ai-connector"]
-```
+Useful variants for the `args`:
 
-If you installed **from source into a venv** instead, use the **absolute path**
-to the binary — Claude Desktop is a GUI app and does **not** inherit your shell's
-`PATH`, so a bare `"exchange-ai-connector"` won't launch:
+- **Pin a version** (reproducible; uses uv's cache without re-resolving — handy if
+  your network can't always reach PyPI): `["exchange-ai-connector@0.2.0"]`
+- **Run an unreleased version from GitHub:**
+  `["--from", "git+https://github.com/wteja/exchange-ai-connector", "exchange-ai-connector"]`
+
+If you installed **from source into a venv** instead, point `command` at the
+binary's absolute path (same PATH reason as above):
 
 ```json
 "command": "/ABSOLUTE/PATH/TO/.venv/bin/exchange-ai-connector"
