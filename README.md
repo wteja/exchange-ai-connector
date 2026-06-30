@@ -1,94 +1,211 @@
 # exchange-ai-connector
 
-An MCP server that lets an AI agent read and send your Microsoft 365 / Outlook
-email, with every send gated by your MCP client's confirmation prompt.
+An MCP server that lets an AI agent read and act on your Microsoft 365 / Outlook
+**email and calendar**, with every state-changing action (sending mail, creating
+an event) gated by your MCP client's confirmation prompt.
+
+## Tools
+
+| Tool                 | Kind         | What it does                                           |
+|----------------------|--------------|--------------------------------------------------------|
+| `list_emails`        | read-only    | List messages in a folder (default inbox)              |
+| `read_email`         | read-only    | Read one message in full                               |
+| `read_thread`        | read-only    | Read a whole conversation, oldest → newest             |
+| `send_email`         | **gated**    | Send or reply — client confirms first                  |
+| `list_events`        | read-only    | List upcoming calendar events                          |
+| `read_event`         | read-only    | Read one event in full                                 |
+| `check_availability` | read-only    | Free/busy for you (+ others) — *work/school only*      |
+| `create_event`       | **gated**    | Create an event, optionally inviting attendees         |
 
 ## How the human-in-the-loop gate works
 
-`list_emails`, `read_email`, and `read_thread` are read-only and run freely.
-`send_email` is the only tool that changes the outside world; it is annotated as
-destructive, so your MCP client (e.g. Claude Desktop) shows you the exact
-recipients, subject, and body and waits for your approval before it runs. The
-draft you review *is* the agent's proposed `send_email` arguments — nothing is
-stored half-sent.
+The read-only tools run freely. The two **gated** tools (`send_email`,
+`create_event`) are the only ones that change the outside world; they are
+annotated as destructive, so your MCP client (e.g. Claude Desktop) shows you the
+exact arguments — recipients, subject, body / event details — and waits for your
+approval before running. The draft you review *is* the agent's proposed
+arguments; nothing is stored half-sent. Reject and it vanishes.
 
-## One-time setup
+## Account-type support
 
-1. Register an app in Microsoft Entra ID:
-   - Supported account types: **multitenant + personal Microsoft accounts**.
-   - Add a **Mobile and desktop** redirect URI: `http://localhost:8400`.
-   - Under **API permissions**, add delegated Microsoft Graph scopes
-     `Mail.Read`, `Mail.Send`, and `Calendars.ReadWrite`. On a corporate tenant
-     a tenant admin may need to grant consent. Adding `Calendars.ReadWrite`
-     triggers a one-time browser re-consent on the next run.
-2. Install:
-   ```bash
-   cd src
-   pip install -e .
-   ```
-3. Export your app's Application (client) ID:
-   ```bash
-   export EXCHANGE_AI_CLIENT_ID="<your-app-client-id>"
-   # optional, to pin to one tenant instead of the multi-tenant default:
-   # export EXCHANGE_AI_AUTHORITY="https://login.microsoftonline.com/<tenant-id>"
-   # optional, to override the auto-detected timezone (defaults to /etc/localtime, falling back to UTC):
-   # export EXCHANGE_AI_TIMEZONE="Asia/Bangkok"
-   ```
+| Account type                          | Email | Calendar read/create | `check_availability` |
+|---------------------------------------|:-----:|:--------------------:|:--------------------:|
+| Work / school (Microsoft 365)         |   ✅  |          ✅          |          ✅          |
+| Personal (outlook.com / hotmail)      |   ✅  |          ✅          |          ❌¹         |
 
-## Run
+¹ Graph's `getSchedule` (free/busy) is not available on personal Microsoft
+accounts. `check_availability` returns a readable error there; every other tool
+works.
+
+---
+
+## Setup
+
+### 1. Register an app in Microsoft Entra ID
+
+1. Go to **https://entra.microsoft.com** → **Identity → Applications → App
+   registrations** → **New registration**.
+2. **Name:** anything (e.g. `exchange-ai-connector`).
+3. **Supported account types:** *Accounts in any organizational directory
+   (multitenant) and personal Microsoft accounts*.
+4. **Redirect URI:** platform **Public client/native (mobile & desktop)**, value
+   `http://localhost:8400`.
+5. Click **Register**, then copy the **Application (client) ID** from the
+   overview page — you'll need it below.
+
+### 2. Add Microsoft Graph permissions
+
+1. In your app → **API permissions** → **Add a permission** → **Microsoft
+   Graph** → **Delegated permissions**.
+2. Add: **`Mail.Read`**, **`Mail.Send`**, **`Calendars.ReadWrite`**.
+3. **Personal account:** nothing more — you consent in the browser on first run.
+   **Work/school account:** a tenant admin may need to click **Grant admin
+   consent**.
+
+> Adding `Calendars.ReadWrite` later (e.g. after using email-only) triggers a
+> one-time browser re-consent on the next run. See *Re-consent* below.
+
+### 3. Install
 
 ```bash
-exchange-ai-connector
+cd src
+pip install -e .
 ```
 
-On first run a browser opens for sign-in and consent; the token is cached in
-your OS keychain and refreshed silently afterward.
+This installs the `exchange-ai-connector` command into the active Python
+environment. If you used a virtualenv, note its path — you'll need it for the
+Claude Desktop config below:
 
-### Claude Desktop config
+```bash
+which exchange-ai-connector
+# e.g. /Users/you/code/exchange-ai-connector/.venv/bin/exchange-ai-connector
+```
+
+### 4. Configure environment
+
+```bash
+export EXCHANGE_AI_CLIENT_ID="<your-app-client-id>"
+
+# optional — pin to one tenant instead of the multi-tenant default:
+# export EXCHANGE_AI_AUTHORITY="https://login.microsoftonline.com/<tenant-id>"
+
+# optional — override the auto-detected timezone (default: /etc/localtime, else UTC):
+# export EXCHANGE_AI_TIMEZONE="Asia/Bangkok"
+```
+
+`EXCHANGE_AI_CLIENT_ID` is required; the other two are optional.
+
+---
+
+## Claude Desktop setup
+
+Edit (on macOS) `~/Library/Application Support/Claude/claude_desktop_config.json`
+and add an `exchange-ai` server under `mcpServers`:
 
 ```json
 {
   "mcpServers": {
     "exchange-ai": {
-      "command": "exchange-ai-connector",
-      "env": { "EXCHANGE_AI_CLIENT_ID": "<your-app-client-id>" }
+      "command": "/ABSOLUTE/PATH/TO/.venv/bin/exchange-ai-connector",
+      "env": {
+        "EXCHANGE_AI_CLIENT_ID": "<your-app-client-id>",
+        "EXCHANGE_AI_TIMEZONE": "Asia/Bangkok"
+      }
     }
   }
 }
 ```
 
-## Manual smoke test
+> **Use the absolute path** from `which exchange-ai-connector`. Claude Desktop is
+> a GUI app and does **not** inherit your shell's `PATH`, so a bare
+> `"exchange-ai-connector"` will fail to launch unless the command is installed
+> globally. The `.venv/bin/...` path is the reliable choice.
 
-### Email smoke test (v1)
+Then **fully quit** Claude Desktop (Cmd+Q) and reopen it. The `exchange-ai`
+server and its tools should appear in the tools/connector list.
 
-1. Start the server (or restart Claude Desktop with the config above).
-2. Ask the agent: "List my latest 5 emails." → confirm `list_emails` returns them.
-3. Ask: "Send a test email to myself with subject 'hello'." → the client shows
-   the draft; approve it.
-4. Check your inbox for the email and confirm a line was appended to
-   `~/.exchange-ai-connector/audit.log`.
+On the **first tool call** a browser opens for sign-in and consent; the token is
+cached in your OS keychain and refreshed silently afterward.
 
-### Calendar smoke test (v2)
+**Suggested approvals:** allow the read-only tools (`list_emails`, `read_email`,
+`read_thread`, `list_events`, `read_event`, `check_availability`) to run without
+asking, but leave `send_email` and `create_event` on *ask every time* — that's
+the human-in-the-loop gate doing its job.
 
-> **Personal-account note:** `list_events`, `read_event`, and `create_event`
-> work on all account types (work, school, and personal outlook.com/hotmail
-> accounts). `check_availability` (free/busy via Graph `getSchedule`) requires
-> a **work or school account** — personal Microsoft accounts are not supported
-> by Graph for this call and will return an error.
+### Run standalone (without a client)
 
-1. Ask the agent: "What's on my calendar?" → confirm `list_events` returns events.
-2. Ask: "Am I free tomorrow 2–3pm?" → `check_availability` returns free/busy
-   (work/school account only; see note above).
-3. Ask: "Create a 30-minute event tomorrow at 2pm titled 'Test'." → the client
-   shows `create_event(...)` with the full args and waits for your approval.
-   Approve → the event appears in Outlook and a `kind:"event"` line is appended
-   to `~/.exchange-ai-connector/audit.log`.
+```bash
+exchange-ai-connector
+```
+
+It's a stdio MCP server, so it waits silently for a client to connect — there's
+no interactive output. This is mainly useful for confirming it starts.
+
+---
+
+## Example usage (sample prompts)
+
+Once it's wired into Claude Desktop, drive it in plain language. Examples:
+
+**Reading email**
+- "List my latest 10 emails."
+- "Show me unread emails from this week."
+- "Read the full email from Alice about the invoice."
+- "Show me the whole thread for that conversation."
+
+**Sending email (gated — you'll approve the draft)**
+- "Reply to Alice's email saying I'll have the report by Friday."
+- "Send an email to bob@example.com, subject 'Lunch?', asking if he's free Thursday."
+- "Forward the invoice email to accounting@example.com with a short note."
+
+**Reading the calendar**
+- "What's on my calendar this week?"
+- "Read the details of my 2pm meeting tomorrow."
+- "Am I free tomorrow 2–3pm?"  *(work/school accounts only)*
+- "When are alice@contoso.com and I both free Thursday afternoon?"  *(work/school only)*
+
+**Creating events (gated — you'll approve the details)**
+- "Create a 30-minute event tomorrow at 2pm titled 'Project sync'."
+- "Schedule a 1-hour meeting Friday 10am called 'Design review', invite alice@contoso.com and bob@contoso.com."
+- "Block 9–11am Monday for focus time."
+
+For the gated actions, Claude Desktop shows the exact `send_email(...)` /
+`create_event(...)` arguments and waits for your **Approve / Deny**. Want a
+change? Tell the agent ("make it 45 minutes", "cc my manager") and it re-proposes.
+
+---
 
 ## Audit log
 
-Every send appends one JSON line (timestamp, recipients, subject) to
-`~/.exchange-ai-connector/audit.log`. Every created event appends a line with
-`"kind": "event"` (timestamp, subject, start, and attendees if given).
+Every gated action appends one JSON line to
+`~/.exchange-ai-connector/audit.log`:
+
+- **Sends:** `{ts, to, subject[, reply_to_id]}`
+- **Events:** `{ts, kind:"event", subject, start[, attendees]}`
+
+Append-only JSONL, `grep`-able:
+
+```bash
+grep '"kind": "event"' ~/.exchange-ai-connector/audit.log
+```
+
+---
+
+## Re-consent / token cache
+
+The OAuth token is cached in your OS keychain (service
+`exchange-ai-connector`, account `msal-token-cache`) and refreshed silently. The
+cached token only carries the scopes you consented to. If you **add a scope**
+(e.g. enabling calendar after email-only), clear the cache so the next run
+re-prompts the browser with the new scopes:
+
+```bash
+python -c "import keyring; keyring.delete_password('exchange-ai-connector','msal-token-cache')"
+```
+
+("Not found" just means there was no cache to clear.) Then restart your client.
+
+---
 
 ## Scope
 
